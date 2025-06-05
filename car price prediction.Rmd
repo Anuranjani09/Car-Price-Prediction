@@ -1,0 +1,893 @@
+---
+title: "Predictive Analysis of Car Prices: Identifying the Factors Influencing MSRP"
+subtitle: 'MATH 40028/50028: Statistical Learning'
+date: "May 05, 2024"
+output:
+  html_document:
+    df_print: paged
+fontfamily: mathpazo
+fontsize: 11pt
+header-includes: \linespread{1.05}
+urlcolor: blue
+---
+
+
+
+## **Introduction**
+
+#### **Car Features and MSRP Dataset**
+
+The dataset includes information about the features of cars, along with their corresponding Manufacturer's Suggested Retail Prices (MSRP). It contains over 11,000 entries and 16 variables, providing a comprehensive view of various aspects such as make, model, year, engine specifications, transmission type, and more. This dataset serves as a valuable resource for understanding the dynamics of automotive pricing and the factors that influence it.In today's automotive market, buyers are often presented with a wide variety of vehicle options, ranging from compact city cars to rugged SUVs, each with its own unique set of features and specifications. However, one key factor that heavily influences a buyer's decision-making process is the Manufacturer's Suggested Retail Price (MSRP) of the vehicle.The MSRP provides potential buyers with an estimated price range for a particular car model. While the MSRP is typically determined by the manufacturer based on various factors such as production costs, market demand, and competitor pricing, predicting it accurately can be a complex task, especially given the multitude of features and attributes that contribute to a car's value.
+
+#### **Target Population, Sample Strategies, Potential Bias**
+
+The target population for this analysis encompasses a diverse array of stakeholders within the automotive ecosystem, ranging from prospective car buyers to industry insiders seeking deeper insights into price trends.The method used for gathering the car's characteristics and the MSRP approach have a big impact on how representative it is. For instance, the data can be biased in favor of the brands or models that the company sells if it originated from the inventory system of a car dealership. In the same way, data sourced from online listings could contain a higher percentage of cars from sellers who list their vehicles online, excluding cars that are sold through other channels.Accurately evaluating the dataset's conclusions requires an understanding of how it was gathered.
+
+The dataset may contain bias due to many variables. The dataset may be biased toward the dynamics of the luxury car industry if the data is mostly composed of automobiles from luxury brands due to a bias towards more expensive vehicles. Furthermore, since the features and costs of older models may vary greatly, a dataset that primarily consists of newer models may not fairly reflect the larger automobile industry.As we do not know from where the data is collected, and it is not mentioned on the website, we cannot accurately determine the sampling strategies and potential bias; we can only speculate.
+
+#### **Prediction Problem**
+
+The problem is to estimate the Manufacturer's Suggested Retail Price (MSRP) of cars based on various inherent features of each vehicle. We aim to estimate the MSRP of cars based on their inherent features, such as engine horsepower, cylinders, transmission type, and vehicle size. By using machine learning techniques, we can develop predictive models that accurately forecast the MSRP for a given car. The goal is to provide valuable insights to stakeholders in the automotive industry to inform pricing strategies, market positioning, and consumer decision-making processes. By accurately predicting the MSRP of cars, we can help manufacturers and dealerships make informed decisions, and consumers can use this information to make informed purchasing decisions.
+
+#### **Data Cleaning and Preprocessing**
+
+After reading the dataset into R, I performed data preprocessing by first examining the dimensions and structure of the dataset, as it will provide insights for further procedure. After checking the structure of the data, the next step I implemented is finding the missing values, found that there are null values in the data and removed them for the data cleaniness and tp produce reliable results. Duplicate rows are found and removed by ensuring that each observation is uniques and contributes distinct information to the analysis. As 'Market.category' is not useful in predicting MSRP of cars, so variable 'Market.category' is removed form the dataset.
+
+#### **Feature Engineering**
+
+There are some variables that are categorical and need to be converted into factor variables for better analysis.The categorical variables such as 'Make', 'Model','Engine.Fuel.Type', 'Transmission.Type', 'Driven_Wheels', 'Vehicle.Size', 'Vehicle.Style are converted into factor variables as this feature transformation is necessary to encode as numerical values for further statistical modeling. Created a new variable called 'car_age' which captures the age of each car based on its manufacturing year relative to a reference year(2017). The age of car is a crucial factor in determining its value and price trends. So, from this 'car_age' we get to know how old is the car and determine its price by its age like for old cars the market value decreases due to factors like wear, tear and usage of it.
+
+#### **Data Splitting**
+
+By using a random sample technique, the data was divided into training and test sets. In particular, 70% of the rows were chosen for the training set, while the remaining 30% were assigned to the test set. By using this technique, the prediction models are kept from overfitting and both sets are ensured to be representative of the entire dataset.The training set is used for model training and parameter estimation, while the test set is used as an independent dataset to assess the effectiveness and capacity for generalization of the learned models.
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+
+```
+
+
+```{r,warning = FALSE, message = FALSE, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+Car_data <- read.csv("C:\\Users\\anu\\Downloads\\data.csv (1)\\data.csv")
+dim(Car_data)
+# Check the structure of the dataset
+str(Car_data)
+# View the first few rows
+head(Car_data)
+# Summarize numerical variables
+summary(Car_data)
+# Check for missing values
+colSums(is.na(Car_data))
+# Remove missing values
+clean_car_data <- na.omit(Car_data)
+str(clean_car_data)
+# Assuming 'data' is your dataset and 'column_to_remove' is the column you want to remove
+car_data <- clean_car_data[, !names(clean_car_data) %in% c("Market.Category")]
+
+# Inspect the dataset to check if the column is removed
+str(car_data)
+# Assuming 'data' is your dataset
+# Check for duplicates
+duplicates <- car_data[duplicated(car_data), ]
+
+# Print duplicates
+print(duplicates)
+# Count duplicates
+num_duplicates <- sum(duplicated(car_data))
+
+# Print number of duplicates
+print(num_duplicates)
+
+# Remove duplicates
+carr_data <- car_data[!duplicated(car_data), ]
+
+# Print the unique dataset
+print(carr_data)
+
+# Convert categorical variables to factors
+categorical_vars <- c('Make', 'Model', 'Engine.Fuel.Type', 'Transmission.Type', 'Driven_Wheels', 'Vehicle.Size', 'Vehicle.Style')
+
+for (var in categorical_vars) {
+  carr_data[[var]] <- as.factor(carr_data[[var]])
+}
+
+str(carr_data)
+
+# Define a function to add a new feature to car_data
+add_new_feature <- function(df) {
+  # Make a copy of the DataFrame
+  df <- df
+  
+  # Calculate the age of the car
+  df$car_age <- 2017 - df$Year
+  
+  # Return the modified DataFrame with the new feature
+  return(df)
+}
+
+# Call the function to add the new feature
+carr_data <- add_new_feature(carr_data)
+str(carr_data)
+
+#DATA SPLITTING
+# Set seed for reproducibility
+set.seed(123)
+
+# Split the data into training and testing sets (e.g., 70% training, 30% testing)
+train_indices <- sample(1:nrow(carr_data), 0.7 * nrow(carr_data))
+train_data <- carr_data[train_indices, ]
+test_data <- carr_data[-train_indices, ]
+
+# Check the dimensions of the training and testing sets
+dim(train_data)
+dim(test_data)
+
+```
+
+
+## **Statistical learning strategies and methods**
+
+#### **EXPLORATORY DATA ANALYSIS**
+
+
+```{r echo=FALSE}
+# Boxplot of MSRP (Price)
+
+# Calculate the median, quartiles, and outliers for MSRP
+msrp_summary <- summary(train_data$MSRP)
+
+# Calculate the lower and upper whiskers for the boxplot
+iqr <- IQR(train_data$MSRP)
+lower_whisker <- quantile(train_data$MSRP)[2] - 1.5 * iqr
+upper_whisker <- quantile(train_data$MSRP)[4] + 1.5 * iqr
+
+# Filter out outliers
+filtered_indices <- which(train_data$MSRP < lower_whisker | train_data$MSRP > upper_whisker)
+filtered_msrp <- train_data$MSRP[filtered_indices]
+
+# Create a boxplot
+boxplot(train_data$MSRP, ylim = c(0, 80000), col = "lightgreen", border = "black", main = "Distribution of MSRP", ylab = "MSRP")
+
+# Add median line
+abline(h = msrp_summary["Median"], col = "blue")
+
+# Add lower whisker
+abline(h = lower_whisker, lty = 2, col = "red")
+
+# Add upper whisker
+abline(h = upper_whisker, lty = 2, col = "red")
+
+# Add outliers
+points(filtered_indices, filtered_msrp, pch = 19, col = "red")
+
+```
+
+
+The boxplot shows the distribution of MSRP(manufacturer's Suggested Retail Price). The horizontal line in the middle of box is median.The median MSRP is around 30,000dollars. The first quartile is around 20,000dollars and the third quartile is around 40,000 dollars, this means that the middle 50% of cars have MSRPs between 20,000 and 40,000 dollars. There are few outliers that have MSRPs below 10,000.
+
+
+
+
+#### **Distribution Analysis of Numeric Features**
+
+
+```{r echo=FALSE}
+
+# Load necessary libraries
+library(ggplot2)
+library(gridExtra)
+
+# Histogram of Engine HP
+hist_engine_hp <- ggplot(car_data[!is.na(train_data$Engine.HP), ], aes(x = Engine.HP)) +
+  geom_histogram(binwidth = 50, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Engine HP",
+       x = "Engine HP",
+       y = "Frequency")
+
+# Histogram of Highway MPG
+hist_highway_mpg <- ggplot(train_data, aes(x = highway.MPG)) +
+  geom_histogram(fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Highway MPG",
+       x = "Highway MPG",
+       y = "Frequency")
+
+# Histogram of City MPG
+hist_city_mpg <- ggplot(train_data, aes(x = city.mpg)) +
+  geom_histogram(fill = "skyblue", color = "black") +
+  labs(title = "Distribution of City MPG",
+       x = "City MPG",
+       y = "Frequency")
+
+# Car popularity distribution
+popularity_histogram <- ggplot(train_data, aes(x = Popularity)) +
+  geom_histogram(fill = "skyblue", color = "black", bins = 30) +
+  labs(title = "Car Popularity Distribution",
+       x = "Popularity",
+       y = "Frequency")
+
+# Combine plots into one grid
+grid.arrange(hist_engine_hp, hist_highway_mpg, hist_city_mpg, popularity_histogram,
+             ncol = 2, top = "Numeric Variables Distribution")
+
+
+```
+
+
+
+Distribution of Engine.HP: The histogram shows the distribution of the "Engine Horsepower" variable. Most of the cars appear to be in between 200 to 500 engine horsepower than those between 700 to 1000 engine horsepower. We can observe that most of the cars have low engine horsepower values, and a few outliers with very high horsepower.
+Distribution of Highway MPG: The second histogram shows the distribution of Highway miles per gallon(MPG) among the cars.It appears that most of the cars get between 20 to 40 miles per gallon on the highway. There are also a few cars that get less gas mileage.
+Distribution of City MPG: The third histogram shows the distribution of City miles per gallon(MPG). The graph depicts that most of the cars get between 10 and 20 miles per gallon in the city, and there are few cars having 40 to 50 mpg in the city that is having less mileage.
+Distribution of Car Popularity Distribution: The fourth histogram shows the distribution of popularity of car. The graph depicts that most popular cars are those with a popularity around 2000 and also around 6000. 
+
+
+
+####  **Distribution of Engine Fuel Types**
+
+
+
+```{r echo=FALSE}
+
+library(ggplot2)
+ggplot(train_data, aes(x = Engine.Fuel.Type)) +
+  geom_bar(fill = "lightblue", color = "black") +
+  labs(title = "Count of Engine Fuel Type",
+       x = "Engine Fuel Type",
+       y = "# of Engine Fuel Type") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+```
+
+
+
+The bar graph shows the distribution of engine fuel types. There are different types of engine fuel like diesel, electric, flex-fuel (premium unleaded recommended/E85), flex-fuel (premium unleaded required/E85), flex-fuel (unleaded/E85), natural gas, premium unleaded (recommended), premium unleaded (required), and regular unleaded. The graph depicts that the most preferred or common fuel type is regular unleaded followed by premium unleaded(required). Electric and natural gas appear to be the least common fuel types.
+
+
+
+####  **Distribution of Transmission Types**
+
+
+```{r echo=FALSE}
+# Checking the Transmission Type count in the dataset
+library(ggplot2)
+ggplot(train_data, aes(x = Transmission.Type)) +
+  geom_bar(fill = "lightblue", color = "black") +
+  labs(title = "Count of Transmission Type",
+       x = "Transmission Type",
+       y = "# of Transmission Type") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+```
+
+
+The bar plot shows the distribution of different Transmission types, which include automatic, manual, direct drive, and unknown.The graph depicts that automatic is the most common transmission type and then followed by manual. Direct drive and unknown have the least commong transmission types.
+
+
+####  **Distribution of Engine Cylinders**
+
+
+```{r echo=FALSE}
+# Bar plot of Engine Cylinders
+barplot(table(train_data$Engine.Cylinders),
+        main = "Count of Engine Cylinders",
+        xlab = "Engine Cylinders",
+        ylab = "# of Engine Cylinders",
+        col = "lightblue",
+        border = "black")
+```
+
+
+The bar plot shows the distribution of the number of engine cylinders. We observe that the most common engine setup appears to be the 4 and 6 cylinders. Engine with fewer than 4 cylinders and more than 8 appear to be less.
+
+
+
+####  **Distribution of Driven Wheels**
+
+
+```{r echo=FALSE}
+# Bar plot of Driven Wheels
+barplot(table(train_data$Driven_Wheels),
+        main = "Count of Driven Wheels",
+        xlab = "Driven Wheels",
+        ylab = "# of Driven Wheels",
+        col = "lightblue",
+        border = "black")
+
+```
+
+
+The bar plot shows the distribution of the number of drive wheels on the cars, the number of wheels a car has that are all wheel driven, front wheel drive. We can observe that front wheel drive appears to be the most common and followed by all wheel drive and the least is four wheel drive.
+
+
+####  **Distribution of Number of Doors**
+
+
+```{r echo=FALSE}
+# Bar plot of Number of Doors
+barplot(table(train_data$Number.of.Doors),
+        main = "Count of Number of Doors",
+        xlab = "Number of Doors",
+        ylab = "# of Number of Doors",
+        col = "lightblue",
+        border = "black")
+```
+
+
+The bar plot shows the distribution of the  number of doors in cars. The graph depicts that the cars with the most common number of doors is 4. There are also a significant numbers of w=cars with 2 doors. Cars with 3 doors appear to be less common.
+
+
+
+####  **Relationship Between Engine Horsepower and MSRP**
+
+
+```{r echo=FALSE}
+library(ggplot2)
+
+# Create a scatter plot of MSRP vs. Engine HP
+ggplot(train_data, aes(x = Engine.HP, y = MSRP)) +
+  geom_point(color = "blue") +
+  labs(x = "Engine Horsepower", y = "MSRP", title = "Scatter Plot of MSRP vs. Engine HP")
+
+```
+
+
+The scatter plot shows the relationship between car's engine horsepower(Engine.HP) and its MSRP (Manufacturer's Suggested Retail Price).As the engine horsepower increases, the MSRP tends to increase as well, though there is considerable variation in the data.The majority of the data points are clustered towards the lower end of the horsepower range, between around 250 and 500 horsepower, with corresponding MSRPs mostly under $100,000.
+However, there are also some vehicles with higher horsepower ratings, up to around 750 horsepower, which tend to have higher MSRPs, with some exceeding $1,500,000.
+
+
+####  **MSRP Distribution Across Vehicle Sizes**
+
+
+```{r, echo=FALSE, warning = FALSE }
+# Box plot of MSRP across different vehicle sizes with adjusted y-axis scale
+ggplot(carr_data, aes(x = Vehicle.Size, y = MSRP)) +
+  geom_boxplot() +
+  scale_y_continuous(limits = c(0, 80000))  # Adjust the limits according to your preference
+
+```
+
+
+The boxplot shows the distribution of MSRP(Manufacturer's Suggested Retail Price) across different vehicle sizes. We observe that Compact cars appear to have the lowest median MSRP. Large cars appear to have wide range of MSRPs, based on the boxplot followed by midsize cars.
+
+
+####  **Correlation Analysis of Car Features and MSRP**
+
+
+```{r echo=FALSE}
+correlation_matrix <- cor(carr_data[, c("Engine.HP", "highway.MPG", "city.mpg", "MSRP")])
+print(correlation_matrix)
+```
+The relationship between Engine HP and MSRP is moderately positive. This suggests that as engine hp increases, the car's price also increases. The relationship between highway MPG and MSRP is weakly negative, suggesting that higher priced cars tends to have slightly lower highway miles per gallon. The relationship between city MPG and MSRP is also weakly negative, suggesting that high priced cars have slightly lower city miles per gallon.
+
+
+
+###  **Pairwise Correlation Analysis of Numerical Variables**
+
+
+
+```{r echo=FALSE}
+# Install and load the corrplot package
+
+library(corrplot)
+
+# Select numerical variables for correlation analysis
+numerical_vars <- c("Year", "Engine.HP", "Engine.Cylinders", "highway.MPG", "city.mpg", "Popularity", "MSRP", "car_age")
+
+# Calculate the correlation matrix
+correlation_matrix <- cor(train_data[, numerical_vars])
+
+# Visualize the correlation matrix using corrplot
+corrplot(correlation_matrix,
+         method = "color",  # Specify the method for plotting
+         type = "upper",    # Show only the upper triangle of the correlation matrix
+         addCoef.col = "black",  # Add coefficients to the plot in black color
+         tl.col = "black",       # Set color of text labels to black
+         tl.srt = 45,            # Rotate text labels by 45 degrees
+         diag = FALSE           # Exclude diagonal elements from the plot
+)
+
+```
+
+
+
+The visualization of the correlation matrix, shows the pairwise correlations between different numerical variables. We observe that Year and car_age have an average positive correlation (0.70), which makes sense given that car_age is a function of Year.Engine.Cylinders and Engine.HP have a significant positive connection (0.84), suggesting that cars with more cylinders generally have greater horsepower. City.MPG and highway.MPG have strong positive correlation(0.92), indicating that cars with higher highway mileage also have higher city mileage. The three variables Engine.HP (0.66), Engine.cylinders(0.55), and Popularity(0.50), have moderate correlation with MSRP. This suggests that cars with larger engines, more cylinders and more popularity often have higher MSRPs. The MSRP and highway.MPG(-.056) and city.MPG (-0.60)have a somewhat inverse relationship, which show that more fuel-efficient vehicles are typically more affordable. Engine.HP and Year have weak positive correlation with(0.34) and has negative correlation with highway.MPG(-0.26), it suggests that newer cars often have a little bit more horsepower but little bit less highway mileage.
+
+
+
+####  **ANOVA**
+
+
+```{r echo=FALSE}
+# Example: Performing ANOVA to test the relationship between MSRP and each categorical variable
+
+# Define the categorical variables
+categorical_vars <- c("Make", "Engine.Fuel.Type", "Transmission.Type", "Driven_Wheels", "Vehicle.Size", "Vehicle.Style")
+
+# Perform ANOVA for each categorical variable
+for (var in categorical_vars) {
+  # Perform ANOVA
+  anova_result <- aov(MSRP ~ as.factor(get(var)), data = train_data)
+  
+  # Print ANOVA summary
+  cat("ANOVA for", var, ":\n")
+  print(summary(anova_result))
+  cat("\n")
+}
+
+```
+For each categorical variable, the ANOVA test evaluates whether there are significant differences in the mean MSRP across the levels of that variable.In the results, the Pr(>F) values are all very close to 0. This suggests that there are significant differences in MSRP across the levels of each categorical variable.
+The *** next to each categorical variable indicates that the p-value is highly significant (less than 0.001), providing strong evidence against the null hypothesis.Therefore, we can say that there are significant differences in MSRP across the levels of each categorical variable: Make, Engine.Fuel.Type, Transmission.Type, Driven_Wheels, Vehicle.Size, and Vehicle.Style.
+The ANOVA result for the 'Make' variable shows a highly significant p-value (< 2e-16), indicating that the mean MSRP values differ significantly across different car makes. This suggests that the car manufacturer is an important factor influencing the MSRP.
+The ANOVA result for 'Engine.Fuel.Type' also has a highly significant p-value (< 2e-16), implying that the mean MSRP values vary significantly based on the type of engine fuel (e.g., gasoline, diesel, electric).
+The ANOVA result for 'Transmission.Type' is significant, indicating that the mean MSRP differs across different types of transmissions (e.g., automatic, manual).
+The ANOVA result for 'Driven_Wheels' is significant, suggesting that the mean MSRP values vary based on the type of driven wheels (e.g., front-wheel drive, rear-wheel drive, all-wheel drive).
+The ANOVA result for 'Vehicle.Size' is significant, implying that the mean MSRP differs across different vehicle sizes (e.g., compact, midsize, large).
+The ANOVA result for 'Vehicle.Style' is significant, indicating that the mean MSRP values vary based on the style of the vehicle (e.g., sedan, coupe, hatchback).
+
+
+##  **STATISTICAL LEARNING METHODS**
+
+
+For Car features and MSRP data analysis, I have used three different statistical learning methods to model the relationship between various car features and the Manufacturer's Suggested Retail Price(MSRP) that are Random Forest, Decision Tree, and Gradient Boosting. Each of these methods have their own strengths and applicability to the prediction problem.
+
+####  **Random Forest**
+
+By using several decision trees and combining their predictions, Random Forest is an ensemble learning technique that improves accuracy and robustness. It is well-suited for handling complex datasets. For this prediction task, Random Forest is a good choice since it is less susceptible of the impact of outliers or noisy data points. Random Forest is useful for predicting car prices(MSRP) as it can capture complex relationships between car variables including Make, Model, and its engine features and more makes it effective for estimating car costs(MSRP). 
+
+####  **Decision Tree**
+
+Decision tree is a model that works for both classification and regression problems, which are simple to understand and intuitive. Decision Trees are capable of capturing nonlinear relationships, handling both numerical and categorical data, and it requires little data preparation. Decision Trees is useful as it understands the connections between characteristics and MSRP and also can determine which elements most significantly affect since they are comparatively simple to comprehend.
+
+#### **Gradient boosting**
+
+ 
+Gradient boosting machines are effective are a type of ensemble learning method that combines multiple weak learners to improve predictive accuracy. It can also complex non-linear relationships between the predictors and the target variable(MSRP), fitting it for the variables complex interactions. Gradient boosting can be useful to make accurate predictions about car pricing.
+
+
+## **Predictive analysis and results**
+
+#### Random Forest
+
+```{r echo=FALSE, warning = FALSE, message = FALSE}
+library(ranger)
+# Prepare the data
+train_predictors <- train_data[, !(names(train_data) %in% c("MSRP"))]
+train_target <- train_data$MSRP
+
+# Build the Random Forest model using ranger
+rf_model <- ranger(train_target ~ ., data = train_predictors, num.trees = 500)
+
+# View the model summary
+print(rf_model)
+
+# Make predictions on the test data
+test_predictors <- test_data[, !(names(test_data) %in% c("MSRP"))]
+test_target <- test_data$MSRP
+test_predictions <- predict(rf_model, data = test_predictors)$predictions
+
+# Calculate RMSE
+rmse <- sqrt(mean((test_predictions - test_target)^2))
+print(paste("RMSE:", rmse))
+
+# Calculate MAE
+mae <- mean(abs(test_predictions - test_target))
+print(paste("MAE:", mae))
+```
+
+
+
+
+```{r echo=FALSE, warning=FALSE}
+library(ggplot2)
+
+# Create a data frame with actual and predicted values
+results <- data.frame(Actual = test_target, Predicted = test_predictions)
+
+# Create scatter plot
+ggplot(results, aes(x = Actual, y = Predicted)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +  # Add diagonal line
+  labs(x = "Actual", y = "Predicted", title = "Actual vs. Predicted") +
+  scale_x_continuous(
+    limits = c(0, 100000),  # Set x-axis limits
+    breaks = seq(0, 100000, by = 10000),  # Set x-axis breaks
+    labels = scales::comma_format()  # Format x-axis labels without scientific notation
+  ) +
+  scale_y_continuous(
+    limits = c(0, 100000),  # Set y-axis limits
+    breaks = seq(0, 100000, by = 10000),  # Set y-axis breaks
+    labels = scales::comma_format()  # Format y-axis labels without scientific notation
+  ) +
+  theme_minimal()
+
+```
+
+
+
+Using Random forest to predict the Manufacturer's Suggested Retail Price (MSRP) of cars based on various features. The model has achieved an average of 546,320,551 mean squared error (MSE), which represents the difference between the expected and real MSRP values. The model also produced an R-squared value of about 0.845, indicating that the predictor variables in the model is capable for about 84.5% of the variation in MSRP.Additionally, the model showed high predicted accuracy with a mean absolute error (MAE) of around 4,025.33 and a root mean squared error (RMSE) of roughly 17,082.80 on the test data. Based on the provided characteristics, the Random Forest model is a good fit for this prediction because of its ability to reliably identify underlying patterns in the data and produce accurate forecasts of MSRP.
+
+
+#### Decision tree
+
+```{r echo=FALSE}
+# Load required library
+library(rpart)
+
+# Train decision tree model
+dt_model <- rpart(MSRP ~ ., data = train_data, method = "anova")
+
+# Make predictions on test data
+dt_predictions <- predict(dt_model, newdata = test_data)
+
+# Evaluate model
+dt_rmse <- sqrt(mean((test_data$MSRP - dt_predictions)^2))
+print(paste("RMSE:", dt_rmse))
+# Calculate R-squared
+dt_r_squared <- cor(test_data$MSRP, dt_predictions)^2
+print(paste("R-squared:", dt_r_squared))
+
+```
+
+```{r echo=FALSE}
+library(ggplot2)
+
+# Create a data frame with actual and predicted MSRP values
+results <- data.frame(Actual = test_data$MSRP, Predicted = dt_predictions)
+
+# Create scatter plot
+ggplot(results, aes(x = Actual, y = Predicted)) +
+  geom_point(color = "blue") +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +  # Add diagonal line
+  labs(x = "Actual MSRP", y = "Predicted MSRP", title = "Actual vs. Predicted MSRP") +
+  theme_minimal()
+
+```
+
+
+
+Using Decision Tree to predict  the Manufacturer's Suggested Retail Price (MSRP) of cars based on the other features. So it is observed that an An average difference between the expected and actual MSRP values is indicated by the root mean squared error (RMSE), which is around 27,115.67. Furthermore, the R-squared value of around 0.839 shows that the predictor variables in the model can account for 83.9% of the variation in MSRP.Overall, the decision tree model provides insightful information about the correlations between the predictor variables and MSRP, which makes it a helpful tool for comprehending the price dynamics of cars.
+
+
+#### Gradient boosting
+
+```{r warning = FALSE, echo=FALSE}
+set.seed(123)
+# Load required library
+library(gbm)
+
+# Train gradient boosting model
+gbm_model <- gbm(MSRP ~ ., data = train_data, distribution = "gaussian")
+
+# Make predictions on test data
+gbm_predictions <- predict(gbm_model, newdata = test_data, n.trees = 100)
+
+# Evaluate model
+gbm_rmse <- sqrt(mean((test_data$MSRP - gbm_predictions)^2))
+print(paste("RMSE:", gbm_rmse))
+
+# Calculate R-squared
+gbm_r_squared <- cor(test_data$MSRP, gbm_predictions)^2
+print(paste("R-squared:", gbm_r_squared))
+
+```
+
+```{r echo=FALSE, warning=FALSE}
+library(ggplot2)
+
+# Function to format labels without scientific notation
+format_labels <- function(x) {
+  format(x, scientific = FALSE)
+}
+
+# Create a data frame with actual and predicted MSRP values
+results <- data.frame(Actual = test_data$MSRP, Predicted = gbm_predictions)
+
+# Create scatter plot
+ggplot(results, aes(x = Actual, y = Predicted)) +
+  geom_point(color = "blue") +
+  geom_abline(intercept = 0, slope = 1, color = "darkgreen", linetype = "dashed") +  # Add diagonal line
+  labs(x = "Actual MSRP", y = "Predicted MSRP", title = "Actual vs. Predicted MSRP") +
+  scale_x_continuous(
+    limits = c(0, 100000), 
+    breaks = seq(0, 100000, by = 10000),  # Set x-axis breaks
+    labels = format_labels  # Format labels without scientific notation
+  ) +
+  scale_y_continuous(
+    limits = c(0, 100000), 
+    breaks = seq(0, 100000, by = 10000),  # Set y-axis breaks
+    labels = format_labels  # Format labels without scientific notation
+  ) +
+  theme_minimal()
+
+```
+
+
+Using Gradient boosting for predicting the Manufacturer's Suggested Retail Price (MSRP) of cars based on the other features.The model shows some degree of disparity between projected and real MSRP values, with a root mean squared error (RMSE) of around 36,466.77. Furthermore, the model's predictor variables account for around 70.5% of the variance in MSRP, according to the R-squared value of roughly 0.705. Overall, the gradient boosting model is a useful tool for analyzing the price trends, since it provides insightful information about the correlations between the predictor variables and MSRP.
+
+
+
+#### **Bootstrapping the Models**
+
+#### Random forest
+
+```{r echo=FALSE}
+
+library(ranger)
+
+# Number of bootstrap samples
+num_bootstrap <- 100
+
+# Initialize vectors to store performance metrics
+rmse_vec <- numeric(num_bootstrap)
+mae_vec <- numeric(num_bootstrap)
+rsquared_vec <- numeric(num_bootstrap)
+
+# Perform bootstrapping
+for (i in 1:num_bootstrap) {
+  # Sample indices with replacement
+  boot_indices <- sample(nrow(train_data), replace = TRUE)
+  
+  # Subsample from the training data
+  boot_train_data <- train_data[boot_indices, ]
+  
+  # Prepare predictors and target for bootstrapped sample
+  boot_train_predictors <- boot_train_data[, !(names(boot_train_data) %in% c("MSRP"))]
+  boot_train_target <- boot_train_data$MSRP
+  
+  # Build the Random Forest model using ranger
+  rf_model <- ranger(boot_train_target ~ ., data = boot_train_predictors, num.trees = 500)
+  
+  # Make predictions on the test data
+  test_predictions <- predict(rf_model, data = test_predictors)$predictions
+  
+  # Calculate RMSE
+  rmse <- sqrt(mean((test_predictions - test_target)^2))
+  rmse_vec[i] <- rmse
+  
+  # Calculate MAE
+  mae <- mean(abs(test_predictions - test_target))
+  mae_vec[i] <- mae
+  
+  # Calculate R-squared
+  ss_total <- sum((test_target - mean(test_target))^2)
+  ss_residual <- sum((test_target - test_predictions)^2)
+  rsquared <- 1 - (ss_residual / ss_total)
+  rsquared_vec[i] <- rsquared
+}
+
+# Average RMSE, MAE, and R-squared across bootstrap samples
+avg_rmse <- mean(rmse_vec)
+avg_mae <- mean(mae_vec)
+avg_rsquared <- mean(rsquared_vec)
+
+# Standard deviation of RMSE, MAE, and R-squared across bootstrap samples
+sd_rmse <- sd(rmse_vec)
+sd_mae <- sd(mae_vec)
+sd_rsquared <- sd(rsquared_vec)
+
+# Print results
+print(paste("Average RMSE across bootstrap samples:", avg_rmse))
+print(paste("Standard deviation of RMSE across bootstrap samples:", sd_rmse))
+print(paste("Average MAE across bootstrap samples:", avg_mae))
+print(paste("Standard deviation of MAE across bootstrap samples:", sd_mae))
+print(paste("Average R-squared across bootstrap samples:", avg_rsquared))
+print(paste("Standard deviation of R-squared across bootstrap samples:", sd_rsquared))
+
+```
+
+
+
+```{r echo=FALSE}
+library(ggplot2)
+
+# Combine the results into a data frame
+bootstrap_results <- data.frame(RMSE = rmse_vec, MAE = mae_vec, R_squared = rsquared_vec)
+
+# Create density plots for each metric
+density_plots <- lapply(names(bootstrap_results), function(metric) {
+  ggplot(bootstrap_results, aes_string(x = metric)) +
+    geom_density(fill = "skyblue", color = "blue", alpha = 0.6) +
+    labs(title = paste("Density Plot of", metric),
+         x = metric,
+         y = "Density") +
+    theme_minimal()
+})
+
+# Arrange density plots in a grid
+grid.arrange(grobs = density_plots, ncol = 1)
+
+```
+
+
+
+To evaluate the stability and variability of the Random Forest model's performance measures in forecasting the Manufacturer's Suggested Retail Price (MSRP) of cars, the bootstrap resampling approach was utilized.The average root mean squared error (RMSE) over 100 bootstrap samples was determined to be around 22,671.98, with a standard deviation of 8,181.25, suggesting a substantial variation in sample-to-sample variability in prediction accuracy. In the same way, the mean absolute error (MAE) average was around 4,533.27, and the modest 250.91 standard deviation indicated consistent performance in terms of absolute prediction errors. Additionally, the average R-squared value across samples was almost 0.87, meaning that the predictor factors account for approximately 87.0% of the variation in MSRP on average. R-squared's standard deviation was 0.091, suggesting some variation in the model's ability. Overall, we observe that although the Random Forest model predicts MSRP quite well, there is variation in prediction accuracy and model predictive capacity amongst various training set subsets. This shows the significance of determining model stability through bootstrapping.
+
+
+#### Decision tree
+
+```{r echo=FALSE}
+# Load the ranger package
+library(ranger)
+
+# Number of bootstrap samples
+num_bootstrap <- 100
+
+# Initialize vectors to store performance metrics
+rmse_vec <- numeric(num_bootstrap)
+rsquared_vec <- numeric(num_bootstrap)
+
+# Perform bootstrapping
+for (i in 1:num_bootstrap) {
+  # Sample indices with replacement
+  boot_indices <- sample(nrow(train_data), replace = TRUE)
+  
+  # Subsample from the training data
+  boot_train_data <- train_data[boot_indices, ]
+  
+  # Train a random forest model on bootstrapped sample using ranger
+  boot_rf_model <- ranger(MSRP ~ ., data = boot_train_data, num.trees = 500) # You can adjust num.trees and other hyperparameters
+  
+  # Make predictions on test data using bootstrapped model
+  boot_rf_predictions <- predict(boot_rf_model, data = test_data)$predictions
+  
+  # Calculate RMSE for bootstrapped sample
+  boot_rf_rmse <- sqrt(mean((test_data$MSRP - boot_rf_predictions)^2))
+  rmse_vec[i] <- boot_rf_rmse
+  
+  # Calculate R-squared for bootstrapped sample
+  boot_rf_r_squared <- cor(test_data$MSRP, boot_rf_predictions)^2
+  rsquared_vec[i] <- boot_rf_r_squared
+}
+
+# Average RMSE and R-squared across bootstrap samples
+avg_rmse <- mean(rmse_vec)
+avg_rsquared <- mean(rsquared_vec)
+
+# Standard deviation of RMSE and R-squared across bootstrap samples
+sd_rmse <- sd(rmse_vec)
+sd_rsquared <- sd(rsquared_vec)
+
+# Print results
+print(paste("Average RMSE across bootstrap samples:", avg_rmse))
+print(paste("Standard deviation of RMSE across bootstrap samples:", sd_rmse))
+print(paste("Average R-squared across bootstrap samples:", avg_rsquared))
+print(paste("Standard deviation of R-squared across bootstrap samples:", sd_rsquared))
+```
+
+
+The results indicate significant variance in the accuracy of predictions across 100 bootstrap samples, with an average root mean squared error (RMSE) of roughly 22,404.57 and a standard deviation of 7,482.50. Furthermore, the average R-squared value across samples was around 0.88, indicating that 88.3% of the variance in MSRP is, on average, explained by the predictor factors. The R-squared standard deviation was 0.083, indicating some variation in the predictive capacity of the model between bootstrap samples. Overall, we observe that while there is some variation in prediction accuracy and model predictive ability amongst different training data sets, the decision tree model generally does a good job of predicting MSRP. This emphasizes the significance of evaluating model stability through bootstrapping.
+
+```{r echo=FALSE}
+# Using the layout function
+layout(matrix(c(1, 2), nrow = 1, ncol = 2, byrow = TRUE))
+
+# Histogram for RMSE
+hist(rmse_vec, main = "Distribution of RMSE from Bootstrap Samples", xlab = "RMSE", col = "lightblue", border = "black")
+abline(v = avg_rmse, col = "red", lwd = 2, lty = 2)
+legend("topright", legend = paste("Average RMSE =", round(avg_rmse, 2)), bty = "n", cex = 0.8)
+
+# Histogram for R-squared
+hist(rsquared_vec, main = "Distribution of R-squared from Bootstrap Samples", xlab = "R-squared", col = "lightblue", border = "black")
+abline(v = avg_rsquared, col = "red", lwd = 2, lty = 2)
+legend("topright", legend = paste("Average R-squared =", round(avg_rsquared, 2)), bty = "n", cex = 0.8)
+```
+
+
+#### Gradient boosting 
+
+```{r echo=FALSE}
+set.seed(123)
+# Number of bootstrap samples
+num_bootstrap <- 100
+
+# Initialize vectors to store performance metrics
+rmse_vec <- numeric(num_bootstrap)
+rsquared_vec <- numeric(num_bootstrap)
+
+# Perform bootstrapping
+for (i in 1:num_bootstrap) {
+  # Sample indices with replacement
+  boot_indices <- sample(nrow(train_data), replace = TRUE)
+  
+  # Subsample from the training data
+  boot_train_data <- train_data[boot_indices, ]
+  
+  # Train gradient boosting model on bootstrapped sample with tuned hyperparameters
+  boot_gbm_model <- gbm(MSRP ~ ., 
+                        data = boot_train_data, 
+                        distribution = "gaussian", 
+                        n.trees = 500,                  # Increase the number of trees
+                        interaction.depth = 4,          # Maximum interaction depth of 4
+                        shrinkage = 0.01,               # Decrease the shrinkage parameter
+                        n.minobsinnode = 10,            # Minimum number of observations in terminal nodes
+                        bag.fraction = 0.5)             # Use 50% bagging
+  
+  # Make predictions on test data using bootstrapped model
+  boot_gbm_predictions <- predict(boot_gbm_model, newdata = test_data, n.trees = 500)
+  
+  # Calculate RMSE for bootstrapped sample
+  boot_gbm_rmse <- sqrt(mean((test_data$MSRP - boot_gbm_predictions)^2))
+  rmse_vec[i] <- boot_gbm_rmse
+  
+  # Calculate R-squared for bootstrapped sample
+  boot_gbm_r_squared <- cor(test_data$MSRP, boot_gbm_predictions)^2
+  rsquared_vec[i] <- boot_gbm_r_squared
+}
+
+
+# Average RMSE and R-squared across bootstrap samples
+avg_rmse <- mean(rmse_vec)
+avg_rsquared <- mean(rsquared_vec)
+
+# Standard deviation of RMSE and R-squared across bootstrap samples
+sd_rmse <- sd(rmse_vec)
+sd_rsquared <- sd(rsquared_vec)
+
+# Print results
+print(paste("Average RMSE across bootstrap samples:", avg_rmse))
+print(paste("Standard deviation of RMSE across bootstrap samples:", sd_rmse))
+print(paste("Average R-squared across bootstrap samples:", avg_rsquared))
+print(paste("Standard deviation of R-squared across bootstrap samples:", sd_rsquared))
+
+```
+
+
+ 
+```{r echo=FALSE}
+# Create a layout with two plots side by side
+par(mfrow = c(1, 2))
+
+# Histogram for RMSE
+hist(rmse_vec, main = "Distribution of RMSE from Bootstrap Samples", xlab = "RMSE", col = "lightblue", border = "black")
+abline(v = avg_rmse, col = "red", lwd = 2, lty = 2)
+legend("topright", legend = paste("Average RMSE =", round(avg_rmse, 2)), bty = "n", cex = 0.8)
+
+# Histogram for R-squared
+hist(rsquared_vec, main = "Distribution of R-squared from Bootstrap Samples", xlab = "R-squared", col = "lightblue", border = "black")
+abline(v = avg_rsquared, col = "red", lwd = 2, lty = 2)
+legend("topright", legend = paste("Average R-squared =", round(avg_rsquared, 2)), bty = "n", cex = 0.8)
+
+# Reset the layout to default
+par(mfrow = c(1, 1))
+
+```
+
+
+The results indicate that, after performing bootstrapping the average Root Mean Squared Error (RMSE) was 43285.25, with a standard deviation of 7501.32, suggesting a significant degree of performance variability in the model. The standard deviation of the average R-squared value, which was 0.581 with a moderate consistency in predicting the variance in MSRP, was 0.143. 
+
+
+
+#### **Results**
+
+
+The above predictive modeling process used Gradient Boosting, Random Forest, and Decision Tree methods. With an R-squared value of 0.8451 and an average RMSE of around 17,082.80, the Random Forest model showed good results. On the other hand, the models for Decision Tree and Gradient Boosting showed somewhat greater RMSE values and lower R-squared values, indicating relatively inferior predictive accuracy. Additionally, bootstrap resampling was used to evaluate the gradient-boosting model's stability. The results showed an R-squared value of 0.5814 and an average RMSE of 43,285.25, with standard deviations suggesting some variation among bootstrap samples. All things considered, these results provide insightful information on the variables affecting car prices, helping the automotive sector make wise decisions.
+
+
+## **CONCLUSION**
+
+#### **Scope and Generalizability**
+
+
+The scope of the predictive analysis conducted on car features and MSRP dataset has a widespread impact on various stakeholders within the automotive industry. These stakeholders include manufacturers, dealerships, and consumers. By accurately predicting the Manufacturer's Suggested Retail Price (MSRP) of cars based on their inherent features like make, model, engine specifications, and transmission type, the analysis provides valuable insights for pricing strategies, market positioning, and consumer decision-making processes. The predictive models developed using machine learning techniques like Random Forest, Decision Tree, and Gradient Boosting offer a robust framework for estimating car prices and understanding the underlying factors influencing them. These models enable stakeholders to make informed decisions regarding production, marketing, and purchasing. Ultimately, this contributes to the efficiency and competitiveness of the automotive market.
+
+The predictive models used in this analysis are designed to forecast the Manufacturer's Suggested Retail Price (MSRP) of cars based on the provided dataset. The models have demonstrated reasonable performance in terms of generalizability, but it's important to acknowledge certain limitations and considerations regarding the generalizability of the analysis. Firstly, the dataset used to train and evaluate the models may not be fully representative of the entire automotive market. It may be biased towards certain brands, models, or market segments, which could limit the models' applicability in other contexts. Additionally, the dataset used for training and evaluation may not capture all of the factors that influence the MSRP of a car, such as market trends, economic conditions, or consumer preferences. Therefore, it's crucial to validate and test the models on diverse datasets to ensure their robustness and applicability across a wider range of scenarios. This will help ensure that the models can accurately forecast the MSRP of cars in different contexts and for different brands and models. Moreover, it's important to consider the potential sources of error and uncertainty in the models. For example, the models may be sensitive to outliers or missing data, which could impact their accuracy and reliability. To mitigate these risks, it's important to use appropriate methods for data cleaning and preprocessing and to carefully evaluate the models' performance on validation datasets. Overall, while the predictive models used in this analysis show promising results, it's important to approach their application with caution and to consider the potential limitations and sources of uncertainty. By doing so, we can ensure that the models are robust and reliable and that they provide accurate forecasts that can be useful for a variety of applications in the automotive industry.
+
+Additionally, the predictive study assumes that the correlations between MSRP and car features found in the data would be true throughout time and in various market scenarios. However, outside variables like shifts in consumer tastes, the state of the economy, and technical developments can influence automobile costs and partially refute the models' predictions. Predictive models must thus be continuously updated and monitored to preserve their accuracy and relevance in the face of shifting market circumstances.
+
+
+#### **Limitations and Possibilities**
+
+
+To guarantee the validity and dependability of the results, despite the predictive analysis's insightful results, several possible restrictions should be noted. To begin with, the quality and representativeness of the dataset may have an impact on the prediction's accuracy. Model performance may be impacted by sample biases introduced by data obtained from certain sources, such as web listings or dealership inventories. Predictive models also only take into account the fundamental characteristics of cars, ignoring other variables that might affect car costs, such as market demand, the state of the economy, and regulatory changes. To improve the predicted accuracy and relevance of the models, additional variables and larger datasets may be included.Additionally, the selection of statistical learning techniques may impose specific restrictions. While decision trees, gradient boosting, and random forests are effective tools for modeling intricate connections, other approaches like neural networks or ensemble methods may be investigated to enhance prediction accuracy even further. Additionally, optimizing model efficiency and interpretability by feature selection strategies and hyperparameter tweaking might increase the predictive models' usefulness in practical applications.
+In conclusion, even if the predictive analysis provides insightful information about the dynamics of auto pricing, it is crucial to recognize and resolve any potential constraints to guarantee the validity and relevance of the results. Future rounds of the research can improve forecast accuracy and offer even deeper insights into the complex dynamics driving automobile pricing in the automotive sector by continually improving techniques, adding external factors, and broadening the sources of datasets.
+
+
+
+
+
+
+
+
+
+
